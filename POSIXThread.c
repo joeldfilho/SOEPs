@@ -1,3 +1,9 @@
+/*  ATENÇÃO!!!!!!
+*   PARA COMPILAR COM O GCC INCLUIR O ARGUMENTO -lpthread
+*   EXEMPLO: gcc POSIXThread.c -o Posix -lpthread
+*/
+
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
