@@ -8,14 +8,11 @@
 
 static int count = 0;
 static int vez = 0;
-pthread_mutex_t mutexCount;
 
 
 void secaoCritica(){
-    pthread_mutex_lock(& mutexCount);
     count++;
     printf("Count = %i. \n", count);
-    pthread_mutex_unlock(& mutexCount);
 }
 
 void *p0 (){
@@ -54,7 +51,7 @@ int main(){
     pthread_create(&id1, NULL, p0, NULL);
 
     pthread_t id2;
-    pthread_create(&id1, NULL, p1, NULL);
+    pthread_create(&id2, NULL, p1, NULL);
     
     int vezes = 0;
     
