@@ -1,9 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<semaphore.h>
+#include<pthread.h>
 
-#define TRUE 1
-#define FALSE 0
 
 /*
 Cinco filósofos estão sentados em uma mesa, cada um com um prato de espaguete à sua frente. Entre os pratos existem 5 garfos para pegar macarrão
@@ -13,64 +12,93 @@ Quando ele quer comer ele tenta pegar os garfos à sua direita e à sua esquerda
 os filósofos devem realizar suas duas atividades sem travar (ficar parados)
 */
 
-//Para representar os garfos vou criar 5 mutex, pois os garfos serão nossa seção crítica (recurso compartilhado)
-pthread_mutex_t garfo[5];
+#define N 5
+#define PENSAR 0
+#define FOME 1
+#define COMER 2
 
-//Para representar a vida de cada filósofo será utilizada uma thread diferente
-pthread_t filosofo[5];
+//Cada filósofo deve pegar os garfos que estão próximos
+#define ESQUERDA (nfilosofo+4)%N //agarrar garfo
+                                 //da esquerda
+#define DIREITA (nfilosofo+1)%N  //agarrar garfo
+                                 //da direita
+void *filosofo(void *num);
+void agarraGarfo(int);
+void deixaGarfo(int);
+void testar(int);
 
-//
-int id[5];
+sem_t mutex;
+sem_t S[N]; //inicializacao do semáforo
+int estado[N];
+int nfilosofo[N]={0,1,2,3,4};
 
-void pegarGarfos(int * filosofo){
-    pthread_mutex_lock(&(garfo[*filosofo]));
-    if(*filosofo > 0){
-        pthread_mutex_lock(&(garfo[*filosofo - 1]));
-    }else{
-        pthread_mutex_lock(&(garfo[4]));
-    }
+//Cria um filósofo. Ele deve pensar por algum tempo e quando sentir fome deve tentar pegar os garfos para comer. Terminando de comer ele deve deixar os garfos para que outro possa comer
+void *filosofo(void *num)
+{
+   while(1)
+   {
+      int *i = num;
+      sleep(rand() %10 + 2);
+      agarraGarfo(*i);
+      sleep(rand() %10 + 1);
+      deixaGarfo(*i);
+   }
 }
 
-void soltarGarfos(int* filosofo){
-    pthread_mutex_unlock(&(garfo[*filosofo]));
-    if(*filosofo > 0){
-        pthread_mutex_unlock(&(garfo[*filosofo - 1]));
-    }else{
-        pthread_mutex_unlock(&(garfo[4]));
-    }
-
-    printf("Filosofo %d terminou de comer. \n", *filosofo);
+//Filósofo tenta pegar os garfos a sua esquerda e direita
+void agarraGarfo(int nfilosofo)
+{
+   sem_wait(&mutex);
+   estado[nfilosofo] = FOME;
+   printf("Filosofo %d tem fome.\n", nfilosofo+1);
+   //+1 para imprimir filosofo 1 e nao filosofo 0
+   testar(nfilosofo);
+   sem_post(&mutex);
+   sem_wait(&S[nfilosofo]);
+   sleep(1);
 }
 
-
-void * vidaFilosofo(void * var){
-    while(TRUE){
-        int * filosofo = (int*) (var);
-
-        int pensar = (rand() %10 + 2);
-        printf("Filosofo %d: pensando. \n", filosofo);
-        sleep(pensar);
-
-        pegarGarfos(filosofo);
-        int tempoComendo =(rand()%10 + 3);
-        printf("Filosofo %d comendo por %i segundos. \n", filosofo, tempoComendo);
-        sleep(tempoComendo);
-        soltarGarfos(filosofo);
-    }
-    pthread_exit(NULL);
+//Quando termina de comer o filósofo deve soltar os garfos e voltar a pensar
+void deixaGarfo(int nfilosofo)
+{
+   sem_wait(&mutex);
+   estado[nfilosofo]=PENSAR;
+   printf("Filosofo %d deixou os garfos %d e %d.\n", nfilosofo+1, ESQUERDA+1, nfilosofo+1);
+   printf("Filosofo %d esta a pensar.\n", nfilosofo+1);
+   testar(ESQUERDA);
+   testar(DIREITA);
+   sem_post(&mutex);
 }
 
-int main(){
-    for( int i = 0; i <= 4; i++){
-        pthread_mutex_init(&(garfo[i]));
-    }
-    for(int j = 0; j <= 4; j++){
-        id[j] = j;
-        pthread_create(&filosofo[j], NULL, &vidaFilosofo, (void*)&id[j]);
-    }
+//Verifica se o filósofo pode pegar os garfos, os garfos só estarão disponíveis se o filósofo da esquerda e o da direita não estiverem comendo
+void testar(int nfilosofo)
+{
+   if(estado[nfilosofo]==FOME && estado[ESQUERDA]
+ !=COMER && estado[DIREITA]!=COMER)
+   {
+      estado[nfilosofo]=COMER;
+      sleep(2);
+      printf("Filosofo %d agarrou os garfos %d e %d.\n", nfilosofo+1, ESQUERDA+1, nfilosofo+1);
+      printf("Filosofo %d esta a comer.\n", nfilosofo+1);
+      sem_post(&S[nfilosofo]);
+   }
+}
 
-    while(TRUE){
-
-    }
-    return 0;
+int main() {
+   int i;
+   pthread_t thread_id[N]; //identificadores das
+                           //threads
+   sem_init(&mutex,0,1);
+   for(i=0;i<N;i++)
+      sem_init(&S[i],0,0);
+   for(i=0;i<N;i++)
+   {
+      pthread_create(&thread_id[i], NULL, filosofo, &nfilosofo[i]);
+      //criar as threads
+      printf("Filosofo %d esta a pensar.\n",i+1);
+   }
+   for(i=0;i<N;i++)
+   pthread_join(thread_id[i],NULL); //para
+                                    //fazer a junção das threads
+   return(0);
 }
